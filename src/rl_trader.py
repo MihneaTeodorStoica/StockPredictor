@@ -28,6 +28,8 @@ from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import EvalCallback
+import random
+import torch
 
 # ---------------------------------------------------------------------------
 #  1.  Smart synthetic market generator                                       
@@ -142,8 +144,23 @@ class StockTradingEnv(gym.Env):
 # ---------------------------------------------------------------------------
 #  3.  Train PPO agent                                                        
 # ---------------------------------------------------------------------------
+def set_global_seed(seed: int = 42):
+    """Set seeds for reproducibility across libraries."""
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    try:
+        import gymnasium as gym
+        gym.utils.seeding.np_random(seed)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
-    gen = SmartMarketGenerator()
+    SEED = 42
+    set_global_seed(SEED)
+    gen = SmartMarketGenerator(seed=SEED)
     df_market = gen.generate(5_000)
 
     # Quick sanity check: plot first 500 days
@@ -155,11 +172,13 @@ if __name__ == "__main__":
     env_fn = lambda: StockTradingEnv(df_market, window=30, transaction_cost=0.001)
     vec_env = DummyVecEnv([env_fn])
     vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.)
+    vec_env.seed(SEED)
 
     # Evaluation environment (no training leakage)
     test_df = gen.generate(2_500, start=df_market["Close"].iloc[-1])
     eval_env = DummyVecEnv([lambda: StockTradingEnv(test_df, transaction_cost=0.001)])
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=True, clip_obs=10.)
+    eval_env.seed(SEED)
 
     # Evaluation callback for early stopping and best model saving
     eval_callback = EvalCallback(eval_env, best_model_save_path="./data/best_model/",
@@ -168,7 +187,7 @@ if __name__ == "__main__":
 
     model = PPO(
         "MlpPolicy", vec_env, verbose=1, n_steps=2048, batch_size=64, gamma=0.99,
-        learning_rate=3e-4, tensorboard_log="./data/tb_logs/"
+        learning_rate=3e-4, tensorboard_log="./data/tb_logs/", device="cuda" # optional
     )
     model.learn(total_timesteps=200_000, callback=eval_callback)
     model.save("data/ppo_trader")
@@ -178,13 +197,28 @@ if __name__ == "__main__":
     # from stable_baselines3 import PPO
     # model = PPO.load("./data/best_model/best_model.zip", env=eval_env)
 
+    # --- Load normalization stats for evaluation ---
+    from stable_baselines3.common.vec_env import VecNormalize
+    eval_env = VecNormalize.load("data/vec_normalize.pkl", eval_env)
+
     # Evaluate on a fresh slice (no training leakage)
     obs = eval_env.reset()
     values = []
+    actions = []
+    rewards = []
+    cashes = []
+    stocks = []
     while True:
         action, _ = model.predict(obs, deterministic=True)
-        obs, _, done, info = eval_env.step(action)
-        values.append(info[0]["portfolio_value"] if isinstance(info, list) else info["portfolio_value"])
+        obs, reward, done, info = eval_env.step(action)
+        val = info[0]["portfolio_value"] if isinstance(info, list) else info["portfolio_value"]
+        values.append(val)
+        actions.append(int(action[0]) if isinstance(action, np.ndarray) else int(action))
+        rewards.append(reward[0] if isinstance(reward, np.ndarray) else reward)
+        # Logging cash/stock (if available)
+        if hasattr(eval_env.envs[0], 'cash') and hasattr(eval_env.envs[0], 'stock'):
+            cashes.append(eval_env.envs[0].cash)
+            stocks.append(eval_env.envs[0].stock)
         if done:
             break
 
@@ -196,6 +230,17 @@ if __name__ == "__main__":
     plt.grid(True); plt.tight_layout(); plt.savefig("data/equity_curve_rl.png", dpi=300)
     plt.show()
 
-    print(f"Final equity = ${equity.iloc[-1]:.4f}\nSaved: data/smart_price_sample.png | data/equity_curve_rl.png | data/ppo_trader.zip")
+    # --- Logging ---
+    log_df = pd.DataFrame({
+        'Date': equity.index,
+        'Equity': values,
+        'Action': actions,
+        'Reward': rewards,
+        'Cash': cashes if cashes else None,
+        'Stock': stocks if stocks else None
+    })
+    log_df.to_csv("data/simulation_log.csv", index=False)
+    print(log_df.head())
+    print(f"Final equity = ${equity.iloc[-1]:.4f}\nSaved: data/smart_price_sample.png | data/equity_curve_rl.png | data/ppo_trader.zip | data/simulation_log.csv")
 
     # For further improvement, consider hyperparameter tuning, curriculum learning, or using more advanced RL algorithms.
