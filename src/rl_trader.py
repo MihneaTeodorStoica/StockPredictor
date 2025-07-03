@@ -183,7 +183,7 @@ if __name__ == "__main__":
     values = []
     while True:
         action, _ = model.predict(obs, deterministic=True)
-        obs, _, done, _, info = eval_env.step(action)
+        obs, _, done, info = eval_env.step(action)
         values.append(info[0]["portfolio_value"] if isinstance(info, list) else info["portfolio_value"])
         if done:
             break
