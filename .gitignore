@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+*.zip
+.DS_Store
+.ipynb_checkpoints/
+# VSCode
+.vscode/
+# Data
+# *.csv
+!/data/*.csv  # allow csvs in data/ for testing
+*.png
+# Model files and logs
+*.zip
+*.pkl
+*.npz
+# /data/
+!/data/*.csv  # allow raw data if needed, comment out if not
+!/data/*.md   # allow markdown docs if any
+!/data/README.md
+# TensorBoard logs
+**/tb_logs/
+# Best model and checkpoints
+**/best_model/
+**/logs/
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+# Ignore VSCode settings
+.vscode/
