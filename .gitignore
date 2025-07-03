@@ -13,7 +13,7 @@ __pycache__/
 # Data
 # *.csv
 !/data/*.csv  # allow csvs in data/ for testing
-*.png
+# *.png
 # Model files and logs
 *.zip
 *.pkl
