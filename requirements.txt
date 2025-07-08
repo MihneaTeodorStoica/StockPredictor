@@ -1,6 +1,5 @@
 pandas
-numpy
+tqdm
 matplotlib
-gymnasium
-stable-baselines3
-tensorboard
+tensorflow
+scikit-learn

@@ -31,3 +31,9 @@ __pycache__/
 .ipynb_checkpoints/
 # Ignore VSCode settings
 .vscode/
+
+data/*
+!data/archive.zip
+
+__pycache__
+*.pyc
