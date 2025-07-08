@@ -33,7 +33,7 @@ __pycache__/
 .vscode/
 
 data/*
-!data/archive.zip
+data/archive.zip
 
 __pycache__
 *.pyc
