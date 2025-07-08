@@ -145,10 +145,3 @@ See `simulate.py` for simulation logic.
 ## 📜 License
 
 MIT – free for personal and commercial use. Attribution appreciated.
-
----
-
-## ✍️ Author
-
-Built by Mihnea.  
-📧 Contact: ms7322@columbia.edu
